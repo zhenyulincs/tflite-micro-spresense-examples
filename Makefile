@@ -65,7 +65,6 @@ LIBTFLM := $(GENDIR)/libtensorflow-microlite.a
 OPTIMIZATION_LEVEL := -O3
 
 CC_WARNINGS := \
-  -Werror \
   -Wmissing-field-initializers \
   -Wunused-function \
   -Wswitch \
@@ -100,7 +99,7 @@ COMMON_FLAGS := \
   $(CC_WARNINGS) \
 
 CXXFLAGS := \
-  -std=c++11 \
+  -std=c++14 \
   -fno-rtti \
   -fno-use-cxa-atexit \
   -fno-threadsafe-statics \
