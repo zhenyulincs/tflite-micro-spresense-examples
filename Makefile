@@ -144,7 +144,7 @@ endif
 
 THIRD_PARTY_CC_SRCS := \
   $(THIRD_PARTY_CC_SRCS) \
-  $(shell find third_party/cmsis/cmsis_nn/Source -name "*.cc" -o -name "*.c")
+  $(shell find third_party/cmsis_nn/Source -name "*.cc" -o -name "*.c")
 
 ALL_SRCS := \
 	$(TFLM_CC_SRCS) \
