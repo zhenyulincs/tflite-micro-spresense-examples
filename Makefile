@@ -117,7 +117,7 @@ INCLUDES := \
   -Ithird_party/cmsis/ \
   -Ithird_party/cmsis/CMSIS/Core/Include/ \
   -Ithird_party/cmsis/CMSIS/DSP/Include/ \
-  -Ithird_party/cmsis/CMSIS/NN/Include/ \
+  -Ithird_party/cmsis/cmsis_nn/Include/ \
   -Ithird_party/flatbuffers/include \
   -Ithird_party/gemmlowp \
   -Ithird_party/kissfft \
