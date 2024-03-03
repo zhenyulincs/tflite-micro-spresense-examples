@@ -15,7 +15,6 @@ limitations under the License.
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/reference/dequantize.h"
 #include "tensorflow/lite/kernels/internal/reference/quantize.h"
 #include "tensorflow/lite/kernels/internal/reference/requantize.h"
@@ -33,27 +32,26 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
+  MicroContext* micro_context = GetMicroContext(context);
+
   // TODO(b/140515557): Add cached dequant to improve hybrid model performance.
-  const TfLiteTensor* input = GetInput(context, node, 0);
+  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = GetOutput(context, node, 0);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TF_LITE_ENSURE(context, output != nullptr);
 
-  TF_LITE_ENSURE(context,
-                 input->type == kTfLiteInt8 || input->type == kTfLiteInt16);
+  TF_LITE_ENSURE(context, input->type == kTfLiteInt8 ||
+                              input->type == kTfLiteInt16 ||
+                              input->type == kTfLiteUInt8);
   TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
-
-  if (output->type == kTfLiteInt32) {
-    const double effective_output_scale =
-        static_cast<double>(input->params.scale) /
-        static_cast<double>(output->params.scale);
-    QuantizeMultiplier(effective_output_scale, &data->output_multiplier,
-                       &data->output_shift);
-  }
 
   data->quantization_params.zero_point = input->params.zero_point;
   data->quantization_params.scale = static_cast<double>(input->params.scale);
   data->output_zero_point = output->params.zero_point;
+
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
+
   return kTfLiteOk;
 }
 

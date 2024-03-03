@@ -32,9 +32,13 @@ const int kLogisticOutputTensor = 0;
 TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
                                                TfLiteNode* node,
                                                OpDataLogistic* data) {
-  const TfLiteTensor* input = GetInput(context, node, kLogisticInputTensor);
+  MicroContext* micro_context = GetMicroContext(context);
+
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kLogisticInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = GetOutput(context, node, kLogisticOutputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kLogisticOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
@@ -92,7 +96,7 @@ TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
 
       data->input_multiplier = static_cast<int32_t>(multiplier);
     }
-
+    TFLITE_DCHECK_LE(data->input_multiplier, 32767);
     int output_scale_log2_rounded;
     TF_LITE_ENSURE(
         context, CheckedLog2(output->params.scale, &output_scale_log2_rounded));
@@ -100,6 +104,8 @@ TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
                       -kOutputFractionalBits);
   }
 
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 

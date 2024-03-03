@@ -20,6 +20,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
@@ -38,17 +39,22 @@ constexpr int kOutputTensor = 0;
 const int kInputOutputMinDimensionNum = 3;
 const int kInputOutputMaxDimensionNum = 4;
 
-void* Init(TfLiteContext* context, const char* buffer, size_t length) {
+void* SpaceToBatchNDInit(TfLiteContext* context, const char* buffer,
+                         size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(SpaceToBatchParams));
 }
 
-TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus SpaceToBatchNDPrepare(TfLiteContext* context, TfLiteNode* node) {
+  MicroContext* micro_context = GetMicroContext(context);
+
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 3);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
-  const TfLiteTensor* input = GetInput(context, node, kInputTensor);
-  TfLiteTensor* output = GetOutput(context, node, kOutputTensor);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kInputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
   TF_LITE_ENSURE(context, input != nullptr && output != nullptr);
 
   TF_LITE_ENSURE(context, NumDimensions(input) >= kInputOutputMinDimensionNum);
@@ -57,10 +63,12 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(output) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
-TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus SpaceToBatchNDEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const SpaceToBatchParams& params =
       *(static_cast<const SpaceToBatchParams*>(node->user_data));
@@ -98,8 +106,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(output));
       break;
     default:
-      TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-                         TfLiteTypeGetName(input->type), input->type);
+      MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
+                  input->type);
       return kTfLiteError;
   }
   return kTfLiteOk;
@@ -107,15 +115,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
 }  // namespace.
 
-TfLiteRegistration Register_SPACE_TO_BATCH_ND() {
-  return {/*init=*/Init,
-          /*free=*/nullptr,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+TFLMRegistration Register_SPACE_TO_BATCH_ND() {
+  return tflite::micro::RegisterOp(SpaceToBatchNDInit, SpaceToBatchNDPrepare,
+                                   SpaceToBatchNDEval);
 }
 
 }  // namespace tflite

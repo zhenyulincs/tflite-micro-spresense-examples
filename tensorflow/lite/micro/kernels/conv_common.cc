@@ -1,4 +1,4 @@
-/* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/lite/c/builtin_op_data.h"
+#include "tensorflow/lite/c/c_api_types.h"
 #include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/common.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
-#include "tensorflow/lite/kernels/internal/reference/conv.h"
-#include "tensorflow/lite/kernels/internal/reference/integer_ops/conv.h"
-#include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
@@ -75,6 +71,11 @@ ConvParams ConvParamsQuantized(const TfLiteConvParams& params,
   return op_params;
 }
 
+void* ConvInit(TfLiteContext* context, const char* buffer, size_t length) {
+  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataConv));
+}
+
 TfLiteStatus CalculateOpDataConv(TfLiteContext* context, TfLiteNode* node,
                                  const TfLiteConvParams& params, int width,
                                  int height, int filter_width,
@@ -93,13 +94,18 @@ TfLiteStatus CalculateOpDataConv(TfLiteContext* context, TfLiteNode* node,
       params.dilation_width_factor, height, width, filter_height, filter_width,
       padding, &out_height, &out_width);
 
-  const TfLiteTensor* input = GetInput(context, node, kConvInputTensor);
+  MicroContext* micro_context = GetMicroContext(context);
+
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  const TfLiteTensor* filter = GetInput(context, node, kConvWeightsTensor);
+  TfLiteTensor* filter =
+      micro_context->AllocateTempInputTensor(node, kConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
-  const TfLiteTensor* bias =
-      GetOptionalInputTensor(context, node, kConvBiasTensor);
-  TfLiteTensor* output = GetOutput(context, node, kConvOutputTensor);
+  TfLiteTensor* bias =
+      micro_context->AllocateTempInputTensor(node, kConvBiasTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
   // Note that quantized inference requires that all tensors have their
@@ -119,6 +125,13 @@ TfLiteStatus CalculateOpDataConv(TfLiteContext* context, TfLiteNode* node,
   data->filter_zero_point = filter->params.zero_point;
   data->output_zero_point = output->params.zero_point;
 
+  micro_context->DeallocateTempTfLiteTensor(output);
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(filter);
+  if (bias != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(bias);
+  }
+
   return kTfLiteOk;
 }
 
@@ -129,13 +142,26 @@ TfLiteStatus ConvPrepare(TfLiteContext* context, TfLiteNode* node) {
   OpDataConv* data = static_cast<OpDataConv*>(node->user_data);
   const auto& params =
       *(static_cast<const TfLiteConvParams*>(node->builtin_data));
+  MicroContext* micro_context = GetMicroContext(context);
 
-  TfLiteTensor* output = GetOutput(context, node, kConvOutputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
-  const TfLiteTensor* input = GetInput(context, node, kConvInputTensor);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  const TfLiteTensor* filter = GetInput(context, node, kConvWeightsTensor);
+  TfLiteTensor* filter =
+      micro_context->AllocateTempInputTensor(node, kConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
+
+  TF_LITE_ENSURE_EQ(context, input->type, output->type);
+  TF_LITE_ENSURE_MSG(
+      context,
+      (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
+          (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
+          (input->type == kTfLiteInt8 &&
+           (filter->type == kTfLiteInt4 || filter->type == kTfLiteInt8)),
+      "Hybrid models are not supported on TFLite Micro.");
 
   const int input_width = input->dims->data[2];
   const int input_height = input->dims->data[1];
@@ -174,6 +200,18 @@ TfLiteStatus ConvPrepare(TfLiteContext* context, TfLiteNode* node) {
       context, node, params, input_width, input_height, filter_width,
       filter_height, output_width, output_height, input->type, data));
 
+  if (filter->type == kTfLiteInt4) {
+    int filter_size =
+        RuntimeShape(filter->dims->size,
+                     reinterpret_cast<const int32_t*>(filter->dims->data))
+            .FlatSize();
+    context->RequestScratchBufferInArena(context, filter_size,
+                                         &data->filter_buffer_index);
+  }
+
+  micro_context->DeallocateTempTfLiteTensor(filter);
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 }  // namespace tflite

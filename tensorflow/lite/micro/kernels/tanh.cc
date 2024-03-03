@@ -1,4 +1,4 @@
-/* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
-namespace ops {
-namespace micro {
-namespace activations {
+
 namespace {
+
 constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
 
@@ -48,11 +48,14 @@ void* TanhInit(TfLiteContext* context, const char* buffer, size_t length) {
 
 TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
                                        OpData* data) {
+  MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  const TfLiteTensor* input = GetInput(context, node, kInputTensor);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = GetOutput(context, node, kOutputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
@@ -115,7 +118,7 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
 
       data->input_multiplier = static_cast<int32_t>(multiplier);
     }
-
+    TFLITE_DCHECK_LE(data->input_multiplier, 32767);
     int output_scale_log2_rounded;
     TF_LITE_ENSURE(
         context, CheckedLog2(output->params.scale, &output_scale_log2_rounded));
@@ -123,6 +126,8 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
                       -kOutputFractionalBits);
   }
 
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
@@ -131,13 +136,16 @@ TfLiteStatus TanhPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   OpData* data = static_cast<OpData*>(node->user_data);
 
-  const TfLiteTensor* input = GetInput(context, node, kInputTensor);
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
   data->input_zero_point = input->params.zero_point;
-  return CalculateArithmeticOpData(context, node, data);
-}
+  TF_LITE_ENSURE_OK(context, CalculateArithmeticOpData(context, node, data));
 
-}  // namespace
+  micro_context->DeallocateTempTfLiteTensor(input);
+  return kTfLiteOk;
+}
 
 TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
@@ -175,25 +183,17 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     default:
-      TF_LITE_KERNEL_LOG(context, "Input %s, output %s not supported.",
-                         TfLiteTypeGetName(input->type),
-                         TfLiteTypeGetName(output->type));
+      MicroPrintf("Input %s, output %s not supported.",
+                  TfLiteTypeGetName(input->type),
+                  TfLiteTypeGetName(output->type), context);
       return kTfLiteError;
   }
 }
 
-}  // namespace activations
+}  // namespace
 
-TfLiteRegistration Register_TANH() {
-  return {/*init=*/activations::TanhInit,
-          /*free=*/nullptr,
-          /*prepare=*/activations::TanhPrepare,
-          /*invoke=*/activations::TanhEval,
-          /*profiling_string=*/nullptr,
-          /*builtin_code=*/0,
-          /*custom_name=*/nullptr,
-          /*version=*/0};
+TFLMRegistration Register_TANH() {
+  return tflite::micro::RegisterOp(TanhInit, TanhPrepare, TanhEval);
 }
-}  // namespace micro
-}  // namespace ops
+
 }  // namespace tflite

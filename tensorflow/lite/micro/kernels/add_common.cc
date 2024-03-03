@@ -39,6 +39,8 @@ TfLiteStatus CalculateOpDataAdd(TfLiteContext* context, TfLiteAddParams* params,
   data->requires_broadcast = !HaveSameShapes(input1, input2);
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
+    TFLITE_CHECK_NE(output->quantization.type, kTfLiteNoQuantization);
+
     // 8bit -> 8bit general quantized path, with general rescalings
     data->input1_offset = -input1->params.zero_point;
     data->input2_offset = -input2->params.zero_point;
@@ -80,11 +82,15 @@ TfLiteStatus AddPrepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  const TfLiteTensor* input1 = GetInput(context, node, kAddInputTensor1);
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input1 =
+      micro_context->AllocateTempInputTensor(node, kAddInputTensor1);
   TF_LITE_ENSURE(context, input1 != nullptr);
-  const TfLiteTensor* input2 = GetInput(context, node, kAddInputTensor2);
+  TfLiteTensor* input2 =
+      micro_context->AllocateTempInputTensor(node, kAddInputTensor2);
   TF_LITE_ENSURE(context, input2 != nullptr);
-  TfLiteTensor* output = GetOutput(context, node, kAddOutputTensor);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kAddOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
   OpDataAdd* data = static_cast<OpDataAdd*>(node->user_data);
@@ -93,6 +99,17 @@ TfLiteStatus AddPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_STATUS(
       CalculateOpDataAdd(context, params, input1, input2, output, data));
 
+  if (output->type == kTfLiteInt32) {
+    // Only support int32 unquantized add for now.
+    TF_LITE_ENSURE_EQ(context, input1->quantization.type,
+                      kTfLiteNoQuantization);
+    TF_LITE_ENSURE_EQ(context, input2->quantization.type,
+                      kTfLiteNoQuantization);
+  }
+
+  micro_context->DeallocateTempTfLiteTensor(input1);
+  micro_context->DeallocateTempTfLiteTensor(input2);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
