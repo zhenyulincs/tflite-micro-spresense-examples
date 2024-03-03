@@ -66,14 +66,12 @@ OPTIMIZATION_LEVEL := -O3
 
 CC_WARNINGS := \
   -Werror \
-  -Wshadow \
   -Wmissing-field-initializers \
   -Wunused-function \
   -Wswitch \
   -Wall \
   -Wextra \
   -Wstrict-aliasing \
-  -Wno-unused-parameter \
   -Wno-sign-compare \
 
 PLATFORM_FLAGS := \
@@ -102,22 +100,23 @@ COMMON_FLAGS := \
   $(CC_WARNINGS) \
 
 CXXFLAGS := \
-  -std=c++14 \
+  -std=c++11 \
   -fno-rtti \
   -fno-use-cxa-atexit \
   -fno-threadsafe-statics \
   $(COMMON_FLAGS)
 
 CCFLAGS := \
-	-std=c14 \
+	-std=c11 \
   $(COMMON_FLAGS)
 
 INCLUDES := \
   -I. \
   -Ithird_party/cmsis/ \
   -Ithird_party/cmsis/CMSIS/Core/Include/ \
-  -Ithird_party/cmsis/CMSIS/DSP/Include/ \
+  -Ithird_party/cmsis_nn/Include/Internal \
   -Ithird_party/cmsis_nn/Include/ \
+  -Ithird_party/cmsis_nn/ \
   -Ithird_party/flatbuffers/include \
   -Ithird_party/gemmlowp \
   -Ithird_party/kissfft \
