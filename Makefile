@@ -102,14 +102,14 @@ COMMON_FLAGS := \
   $(CC_WARNINGS) \
 
 CXXFLAGS := \
-  -std=c++11 \
+  -std=c++14 \
   -fno-rtti \
   -fno-use-cxa-atexit \
   -fno-threadsafe-statics \
   $(COMMON_FLAGS)
 
 CCFLAGS := \
-	-std=c11 \
+	-std=c14 \
   $(COMMON_FLAGS)
 
 INCLUDES := \
