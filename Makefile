@@ -61,7 +61,7 @@ OBJDIR := $(GENDIR)/obj
 BINDIR := $(GENDIR)/bin
 
 LIBTFLM := $(GENDIR)/libtensorflow-microlite.a
-
+HEADERDIR := $(GENDIR)/tensorflow_arduino
 OPTIMIZATION_LEVEL := -O3
 
 CC_WARNINGS := \
@@ -161,6 +161,8 @@ $(OBJDIR)/%.o: %.c
 $(LIBTFLM): $(OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) $(ARFLAGS) $(LIBTFLM) $(OBJS)
+  @mkdir -p $(HEADERDIR)
+    @find . -type f -name "*.h" -exec cp --parents {} $(HEADERDIR) \;
 
 libtflm: $(LIBTFLM)
 
