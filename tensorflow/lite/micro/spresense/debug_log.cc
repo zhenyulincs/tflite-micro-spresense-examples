@@ -34,6 +34,20 @@ void DebugLogArduino(const char* s) {
   }
 #endif
 }
+void DebugLog(const char* format, va_list args) {
+#ifndef TF_LITE_STRIP_ERROR_STRINGS
+  // Reusing TF_LITE_STRIP_ERROR_STRINGS to disable DebugLog completely to get
+  // maximum reduction in binary size. This is because we have DebugLog calls
+  // via TF_LITE_CHECK that are not stubbed out by TF_LITE_REPORT_ERROR.
+  vfprintf(stderr, format, args);
+#endif
+}
+#ifndef TF_LITE_STRIP_ERROR_STRINGS
+int DebugVsnprintf(char* buffer, size_t buf_size, const char* format,
+                              va_list vlist) {
+  return vsnprintf(buffer, buf_size, format, vlist);
+}
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
