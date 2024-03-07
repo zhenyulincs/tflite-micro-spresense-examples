@@ -27,7 +27,7 @@ void RegisterDebugLogCallback(void (*cb)(const char* s)) {
   debug_log_callback = cb;
 }
 
-void DebugLog(const char* s) {
+void DebugLogArduino(const char* s) {
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
   if (debug_log_callback != nullptr) {
     debug_log_callback(s);
