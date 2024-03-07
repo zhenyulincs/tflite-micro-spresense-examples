@@ -161,8 +161,8 @@ $(OBJDIR)/%.o: %.c
 $(LIBTFLM): $(OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) $(ARFLAGS) $(LIBTFLM) $(OBJS)
-  @mkdir -p $(HEADERDIR)
-    @find . -type f -name "*.h" -exec cp --parents {} $(HEADERDIR) \;
+	@mkdir -p $(HEADERDIR)
+	@find . -type f -name "*.h" -exec cp --parents {} $(HEADERDIR) \;
 
 libtflm: $(LIBTFLM)
 
