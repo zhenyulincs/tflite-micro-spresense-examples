@@ -20,6 +20,7 @@ extern "C" {
 #include "tensorflow/lite/micro/debug_log.h"
 
 #include "tensorflow/lite/micro/spresense/debug_log_callback.h"
+#include <stdio.h>
 
 static DebugLogCallback debug_log_callback = nullptr;
 
