@@ -35,7 +35,6 @@ void DebugLog(const char* format, va_list args) {
   // maximum reduction in binary size. This is because we have DebugLog calls
   // via TF_LITE_CHECK that are not stubbed out by TF_LITE_REPORT_ERROR
   if (debug_log_callback != nullptr) {
-    vfprintf(stderr, format, args);
     char buffer[256];
     vsnprintf(buffer, sizeof(buffer), format, args);
     debug_log_callback(buffer);
