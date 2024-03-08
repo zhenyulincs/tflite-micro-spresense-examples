@@ -28,27 +28,26 @@ void RegisterDebugLogCallback(void (*cb)(const char* s)) {
   debug_log_callback = cb;
 }
 
-void DebugLogArduino(const char* s) {
-#ifndef TF_LITE_STRIP_ERROR_STRINGS
-  if (debug_log_callback != nullptr) {
-    debug_log_callback(s);
-  }
-#endif
-}
+
 void DebugLog(const char* format, va_list args) {
-#ifndef TF_LITE_STRIP_ERROR_STRINGS
+// #ifndef TF_LITE_STRIP_ERROR_STRINGS
   // Reusing TF_LITE_STRIP_ERROR_STRINGS to disable DebugLog completely to get
   // maximum reduction in binary size. This is because we have DebugLog calls
-  // via TF_LITE_CHECK that are not stubbed out by TF_LITE_REPORT_ERROR.
-  vfprintf(stderr, format, args);
-#endif
+  // via TF_LITE_CHECK that are not stubbed out by TF_LITE_REPORT_ERROR
+  if (debug_log_callback != nullptr) {
+    vfprintf(stderr, format, args);
+    char buffer[256];
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    debug_log_callback(buffer);
+  }
+// #endif
 }
-#ifndef TF_LITE_STRIP_ERROR_STRINGS
+// #ifndef TF_LITE_STRIP_ERROR_STRINGS
 int DebugVsnprintf(char* buffer, size_t buf_size, const char* format,
                               va_list vlist) {
   return vsnprintf(buffer, buf_size, format, vlist);
 }
-#endif
+// #endif
 
 #ifdef __cplusplus
 }  // extern "C"
