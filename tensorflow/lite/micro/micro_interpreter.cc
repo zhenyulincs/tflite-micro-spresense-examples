@@ -210,18 +210,46 @@ TfLiteStatus MicroInterpreter::AllocateTensors() {
 
   TF_LITE_ENSURE_STATUS(PrepareNodeAndRegistrationDataFromFlatbuffer());
 
-  micro_context_.SetInterpreterState(
-      MicroInterpreterContext::InterpreterState::kInit);
+  // micro_context_.SetInterpreterState(
+  //     MicroInterpreterContext::InterpreterState::kInit);
+    // Only allow AllocatePersistentBuffer in Init stage.
+
+  context_.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;
+
+  context_.RequestScratchBufferInArena = nullptr;
+
+  context_.GetScratchBuffer = nullptr;
+
+  context_.GetExternalContext = nullptr;
   TF_LITE_ENSURE_STATUS(graph_.InitSubgraphs());
 
-  micro_context_.SetInterpreterState(
-      MicroInterpreterContext::InterpreterState::kPrepare);
+  // micro_context_.SetInterpreterState(
+  //     MicroInterpreterContext::InterpreterState::kPrepare);
 
+  // Both AllocatePersistentBuffer and RequestScratchBufferInArena is
+
+  // available in Prepare stage.
+
+  context_.RequestScratchBufferInArena =
+
+      MicroContextRequestScratchBufferInArena;
+
+  // external_context become available in Prepare stage.
+
+  context_.GetExternalContext = MicroContextGetExternalContext;
   TF_LITE_ENSURE_STATUS(graph_.PrepareSubgraphs());
 
-  micro_context_.SetInterpreterState(
-      MicroInterpreterContext::InterpreterState::kMemoryPlanning);
+  // micro_context_.SetInterpreterState(
+  //     MicroInterpreterContext::InterpreterState::kMemoryPlanning);
+    // Prepare is done, we're ready for Invoke. Memory allocation is no longer
 
+  // allowed. Kernels can only fetch scratch buffers via GetScratchBuffer.
+
+  context_.AllocatePersistentBuffer = nullptr;
+
+  context_.RequestScratchBufferInArena = nullptr;
+
+  context_.GetScratchBuffer = MicroContextGetScratchBuffer;
   TF_LITE_ENSURE_OK(&context_, allocator_.FinishModelAllocation(
                                    model_, graph_.GetAllocations(),
                                    &scratch_buffer_handles_));
